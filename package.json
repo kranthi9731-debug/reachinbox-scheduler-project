@@ -1,0 +1,30 @@
+{
+  "name": "reachinbox-scheduler",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@bull-board/api": "^9.10.5",
+    "@bull-board/express": "^9.10.5",
+    "@elastic/elasticsearch": "^9.5.1",
+    "@slack/web-api": "^8.3.0",
+    "bullmq": "^6.5.1",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "express-session": "^1.19.0",
+    "ioredis": "^6.0.0",
+    "node-cron": "^4.6.0",
+    "nodemailer": "^10.3.1",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
+    "pg": "^8.23.1"
+  }
+}

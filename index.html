@@ -1,0 +1,396 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReachInbox Email Scheduler</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f3f4f6;
+      margin: 0;
+      padding: 30px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: auto;
+    }
+
+    .card {
+      background: white;
+      padding: 24px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 10px #ddd;
+    }
+
+    input, textarea, button {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px;
+      margin: 8px 0;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .stat {
+      background: #eff6ff;
+      padding: 18px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .stat h2 {
+      margin: 8px 0;
+    }
+
+    .email {
+      border-bottom: 1px solid #ddd;
+      padding: 12px 0;
+      overflow-wrap: anywhere;
+    }
+
+    #result {
+      font-weight: bold;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+
+    .user-info img {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+    }
+
+    .user-details {
+      flex: 1;
+      min-width: 150px;
+    }
+
+    .logout-btn {
+      width: auto;
+      padding: 10px 22px;
+      background: #dc2626;
+    }
+
+    .login-btn {
+      display: block;
+      text-align: center;
+      text-decoration: none;
+      background: #2563eb;
+      color: white;
+      padding: 13px;
+      border-radius: 6px;
+      font-weight: bold;
+    }
+
+    @media(max-width: 600px) {
+      body {
+        padding: 12px;
+      }
+
+      .stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <h1>ReachInbox Email Scheduler</h1>
+
+  <!-- Google Login -->
+  <div class="card" id="authCard">
+    <h2>Google Account</h2>
+    <p id="authStatus">Checking login...</p>
+    <div id="userInfo"></div>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="card">
+    <h2>Email Dashboard</h2>
+
+    <div class="stats">
+      <div class="stat">
+        Total
+        <h2 id="total">0</h2>
+      </div>
+
+      <div class="stat">
+        Scheduled
+        <h2 id="scheduled">0</h2>
+      </div>
+
+      <div class="stat">
+        Sent
+        <h2 id="sent">0</h2>
+      </div>
+
+      <div class="stat">
+        Failed
+        <h2 id="failed">0</h2>
+      </div>
+    </div>
+  </div>
+
+  <!-- Schedule Email -->
+  <div class="card">
+    <h2>Schedule an Email</h2>
+
+    <form id="emailForm">
+
+      <input
+        type="email"
+        id="to"
+        placeholder="Recipient email"
+        required
+      >
+
+      <input
+        type="text"
+        id="subject"
+        placeholder="Subject"
+        required
+      >
+
+      <textarea
+        id="message"
+        placeholder="Write your message"
+        required
+      ></textarea>
+
+      <label>Schedule date and time (IST)</label>
+
+      <input
+        type="datetime-local"
+        id="scheduledAt"
+        required
+      >
+
+      <button type="submit">Schedule Email</button>
+
+    </form>
+
+    <p id="result"></p>
+  </div>
+
+  <!-- Email List -->
+  <div class="card">
+    <h2>Scheduled Emails</h2>
+
+    <button onclick="loadEmails()">Refresh Emails</button>
+
+    <div id="emailList">Loading...</div>
+  </div>
+
+</div>
+
+<script>
+
+const form = document.getElementById("emailForm");
+const result = document.getElementById("result");
+
+// Google authentication status
+async function checkLogin() {
+  try {
+    const response = await fetch("/api/me");
+    const data = await response.json();
+
+    const authStatus = document.getElementById("authStatus");
+    const userInfo = document.getElementById("userInfo");
+
+    if (data.loggedIn && data.user) {
+      const user = data.user;
+
+      authStatus.textContent = "Successfully logged in with Google";
+
+      userInfo.innerHTML = `
+        <div class="user-info">
+          ${
+            user.photo
+              ? `<img src="${escapeHTML(user.photo)}" alt="Profile">`
+              : ""
+          }
+
+          <div class="user-details">
+            <strong>${escapeHTML(user.name)}</strong>
+            <br>
+            ${escapeHTML(user.email)}
+          </div>
+
+          <button class="logout-btn" onclick="logout()">
+            Logout
+          </button>
+        </div>
+      `;
+    } else {
+      authStatus.textContent = "You are not logged in.";
+
+      userInfo.innerHTML = `
+        <a class="login-btn" href="/auth/google">
+          Login with Google
+        </a>
+      `;
+    }
+
+  } catch (error) {
+    document.getElementById("authStatus").textContent =
+      "Could not check login status.";
+  }
+}
+
+// Logout
+function logout() {
+  window.location.href = "/auth/logout";
+}
+
+// Schedule Email
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const localDateTime =
+    document.getElementById("scheduledAt").value;
+
+  const payload = {
+    to: document.getElementById("to").value,
+    subject: document.getElementById("subject").value,
+    message: document.getElementById("message").value,
+    scheduledAt: new Date(localDateTime).toISOString()
+  };
+
+  try {
+    const response = await fetch("/api/schedule", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+
+    result.textContent = data.message;
+
+    if (response.ok && response.status === 201) {
+      form.reset();
+    }
+
+    await loadEmails();
+
+  } catch (error) {
+    result.textContent = "Could not connect to the server.";
+  }
+});
+
+// Convert UTC to IST
+function formatScheduledTime(date) {
+  if (!date) return "";
+
+  return new Date(date).toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true
+  });
+}
+
+// Load Emails and Dashboard
+async function loadEmails() {
+  try {
+    const response = await fetch("/api/scheduled");
+
+    if (!response.ok) {
+      throw new Error("Failed to load emails");
+    }
+
+    const emails = await response.json();
+
+    document.getElementById("total").textContent =
+      emails.length;
+
+    document.getElementById("scheduled").textContent =
+      emails.filter(e =>
+        e.status === "scheduled" ||
+        e.status === "sending"
+      ).length;
+
+    document.getElementById("sent").textContent =
+      emails.filter(e => e.status === "sent").length;
+
+    document.getElementById("failed").textContent =
+      emails.filter(e => e.status === "failed").length;
+
+    document.getElementById("emailList").innerHTML =
+      emails.map(email => `
+        <div class="email">
+          <strong>${escapeHTML(email.subject || "")}</strong>
+          <br>
+          To: ${escapeHTML(email.to || "")}
+          <br>
+          Status: ${escapeHTML(email.status || "")}
+          <br>
+          Scheduled:
+          ${escapeHTML(formatScheduledTime(email.scheduledAt))} IST
+        </div>
+      `).join("") || "No emails scheduled yet.";
+
+  } catch (error) {
+    document.getElementById("emailList").textContent =
+      "Could not load emails.";
+  }
+}
+
+// Prevent HTML injection
+function escapeHTML(value) {
+  return String(value).replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[char]);
+}
+
+// Initial load
+checkLogin();
+loadEmails();
+
+// Refresh every 10 seconds
+setInterval(loadEmails, 10000);
+
+</script>
+
+</body>
+</html>
